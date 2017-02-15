@@ -20,6 +20,7 @@ network = road_network.read('manhattan_with_distances_clean.txt')
 # Parse the speed limit data.
 #speed_limit.process('Speed_limit_manhattan_verified.csv', 'speed_limit.csv', network)
 speed_limit.read('speed_limit.csv', network)
+speed_limit.plot_sign('plot_sign.csv', network)
 
 # Time of day definition.
 times_of_day = {
@@ -84,7 +85,7 @@ for speed_file in f_speeds.readlines():
     speeds = [float(x) for x in line_tokens[1:]]
     for edge_index, speed in enumerate(speeds):
       if speed == -1:
-        continue
+        continue # Skip roads without computed speeds.
       sign = network.edges[edge_index].sign
       #bin_id = str(hour)
       #bin_id = ','.join([sign, 'before' if dt < announcement_date else 'after'])

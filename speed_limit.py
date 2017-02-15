@@ -145,3 +145,23 @@ def read(input_path, network):
     not_installed, newly_installed, fully_installed)
   print 'contradictions: %d' % len(contradictions)
   f_in.close()
+
+
+def plot_sign(output_path, network):
+  """Generates a scatterplot of points for sign information.
+  
+  Args:
+    output_path: Path to the output file.
+    network: Road network.
+  """
+  f_out = open(output_path, 'w')
+  
+  f_out.write('lat,lon,sign\n')
+  for e in network.edges:
+    source, target = network.nodes[e.source], network.nodes[e.target]
+    #f_out.write('%s,%s\n' % (str(source), e.sign))
+    #f_out.write('%s,%s\n' % (str(target), e.sign))
+    m_lat = (source.lat + target.lat) / 2
+    m_lon = (source.lon + target.lon) / 2
+    f_out.write('%f,%f,%s\n' % (m_lat, m_lon, e.sign))
+    

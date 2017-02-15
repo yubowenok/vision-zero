@@ -14,7 +14,7 @@ class Node:
     self.incident_edges = []
     
   def __str__(self):
-    return '(%f,%f)' % (self.lat, self.lon)
+    return '%f,%f' % (self.lat, self.lon)
 
 
 class Edge:
