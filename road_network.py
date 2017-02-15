@@ -12,6 +12,9 @@ class Node:
     self.lat = lat
     self.lon = lon
     self.incident_edges = []
+    
+  def __str__(self):
+    return '(%f,%f)' % (self.lat, self.lon)
 
 
 class Edge:
@@ -20,6 +23,10 @@ class Edge:
     self.source = source
     self.target = target
     self.dist = dist
+    self.date_inst = datetime.date(1, 1, 1) # Year = 1 denotes no information.
+    self.date_inst_path = '' # path that sets the date_inst
+    self.sign = 'unknown'
+    self.sign_path = '' # path that sets the sign
   
 
 class RoadNetwork:
@@ -69,12 +76,15 @@ class RoadNetwork:
       source: Start point of the path.
       target: End point of the path.
       
-    Returns: A list of node Id's describing the shortest path.
+    Returns: A list of edges describing the shortest path.
     """
-    heap = []
+    
     dist = [float('Inf')] * len(self.nodes) # distances for all nodes
-    prev_edge = [-1] * len(self.nodes)      # incoming edge in the shortest path
     dist[source] = 0
+    
+    prev_edge = [-1] * len(self.nodes)      # incoming edge in the shortest path
+    
+    heap = []
     heapq.heappush(heap, (0, source))
     
     target_reached = False
@@ -93,16 +103,22 @@ class RoadNetwork:
           heapq.heappush(heap, (dist[next_node], next_node))
     
     if target_reached == False:
-      print >> sys.stderr, 'cannot find path from %d to %d' % (source, target)
+      print >> sys.stderr, 'cannot find path from %s/%d to %s/%d' % (
+        self.nodes[source], source, self.nodes[target], target)
       return []
-        
+    
+    source_point = (self.nodes[source].lat, self.nodes[source].lon)
+    target_point = (self.nodes[target].lat, self.nodes[target].lon)
+    rough_dist = vincenty(source_point, target_point).miles
+    if dist[target] - rough_dist > 1:
+      print >> sys.stderr, 'extra distance > 1 mile, weird path from %s/%d to %s/%d' % (
+        self.nodes[source], source, self.nodes[target], target)
+      return []
     # Seek shortest path backwards.
     cur_node = target
     edges_on_path = []
     while cur_node != source:
       edges_on_path.append(prev_edge[cur_node])
-      if prev_edge[cur_node] == -1:
-        print >> sys.stderr, 'cant'
       cur_node = prev_edge[cur_node].source
     return edges_on_path
 

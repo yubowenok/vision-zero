@@ -4,7 +4,7 @@
 # street, hour, time of day, etc.
 
 import sys, datetime, re
-import road_network, sign_installation
+import road_network, sign_installation, speed_limit
 
 num_args = len(sys.argv)
 
@@ -16,7 +16,10 @@ if num_args < 3:
 network = road_network.read('manhattan_with_distances_clean.txt')
 # Parse the sign installation.
 #sign_installation.process('corridors_sign_installation.csv', 'sign_installation.csv', network)
-sign_installation.read('sign_installation.csv', network)
+#sign_installation.read('sign_installation.csv', network)
+# Parse the speed limit data.
+#speed_limit.process('Speed_limit_manhattan_verified.csv', 'speed_limit.csv', network)
+speed_limit.read('speed_limit.csv', network)
 
 # Time of day definition.
 times_of_day = {
@@ -54,6 +57,7 @@ days_of_week_rank = {
 # Stores the bin sum and count.
 # Bin id is '<year>,<month>,<day of week>,<time of day>'
 bins = {}
+announcement_date = datetime.datetime(2014, 11, 7)
 
 # Process the speed files.
 f_speeds = open(sys.argv[1], 'r')
@@ -67,25 +71,28 @@ for speed_file in f_speeds.readlines():
     dt_tokens = [int(x) for x in re.split('-|_', line_tokens[0])]
     year, month, day, hour, minute, second = dt_tokens
     dt = datetime.datetime(year, month, day, hour, minute, second)
-    #time_of_day = ''
-    #for t_of_day, t_range in times_of_day.iteritems():
-    #  # If not in other time_of_day bins, then it's off peak.
-    #  if t_of_day == 'off-peak' or (t_range[0] <= dt.time() and dt.time() <= t_range[1]):
-    #    time_of_day = t_of_day
-    #    break
-    #assert(time_of_day != '')
+    """
+    time_of_day = ''
+    for t_of_day, t_range in times_of_day.iteritems():
+      # If not in other time_of_day bins, then it's off peak.
+      if t_of_day == 'off-peak' or (t_range[0] <= dt.time() and dt.time() <= t_range[1]):
+        time_of_day = t_of_day
+        break
     day_of_week = days_of_week[dt.weekday()]
-    
-    bin_id = str(hour)
-    #bin_id = ','.join([str(x) for x in [year, month, hour]])
-    #bin_id = ','.join([str(x) for x in [year, month, day_of_week, time_of_day]])
-    if not bin_id in bins:
-      bins[bin_id] = [0, 0] # [sum of speed, count]
+    """
     
     speeds = [float(x) for x in line_tokens[1:]]
-    for speed in speeds:
+    for edge_index, speed in enumerate(speeds):
       if speed == -1:
         continue
+      sign = network.edges[edge_index].sign
+      #bin_id = str(hour)
+      #bin_id = ','.join([sign, 'before' if dt < announcement_date else 'after'])
+      bin_id = ','.join([str(x) for x in [year, month, sign]])
+      #bin_id = ','.join([str(x) for x in [year, month, day_of_week, time_of_day]])
+      if not bin_id in bins:
+        bins[bin_id] = [0, 0] # [sum of speed, count]
+      
       bins[bin_id][0] += speed
       bins[bin_id][1] += 1
       
@@ -97,14 +104,13 @@ for bin_id, val in bins.iteritems():
 def results_sorter(x):
   tokens = x[0].split(',')
   # year, month, day_of_week, time_of_day
-  #return [int(tokens[0]), int(tokens[1]), days_of_week_rank[tokens[2]], times_of_day_rank[tokens[3]]]
-  # year, month, hour
-  return [int(x) for x in tokens]
+  # return [int(tokens[0]), int(tokens[1]), days_of_week_rank[tokens[2]], times_of_day_rank[tokens[3]]]
+  # year, month, sign
+  return [int(x) for x in tokens[:-1]] + [0 if tokens[-1] == 'no' else 1]
 
 def bin_id_formatter(x):
-  #year, month, hour = x.split(',')
-  #return year + '/' + ('' if len(month) == 2 else '0') + month + ',' + hour
-  return x
+  year, month, sign = x.split(',')
+  return year + '/' + ('' if len(month) == 2 else '0') + month + ',' + sign
 
 sorted_results = sorted(results, key=results_sorter)
 
@@ -112,8 +118,8 @@ f_output = open(sys.argv[2], 'w')
 
 # CSV header line.
 #f_output.write('Year,Month,Day_of_Week,Time_of_Day,Speed\n')
-#f_output.write('Year/Month,Hour,Speed\n')
-f_output.write('Hour,Speed\n')
+f_output.write('Year/Month,Sign,Speed\n')
+#f_output.write('Sign,Announcement,Speed\n')
 
 for res in sorted_results: 
   f_output.write('%s,' % bin_id_formatter(res[0]))

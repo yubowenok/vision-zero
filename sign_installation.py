@@ -6,7 +6,7 @@ import sys, re
 from dateutil import parser
 
 def process(input_path, output_path, network):
-  """Parses the raw sign installation file and generate a new file that contains
+  """Parses the raw sign installation file and generates a new file that contains
   mapped node id's and only the relative information.
   
   Args:
@@ -15,7 +15,7 @@ def process(input_path, output_path, network):
     network: RoadNetwork returned by road_network.
   """
   
-  print >> sys.stderr, 'reading raw sign installation'
+  print >> sys.stderr, 'reading processed sign installation CSV'
   f_in = open(input_path, 'r')
   f_out = open(output_path, 'w')
   
@@ -59,11 +59,13 @@ def read(input_path, network):
   f_in = open(input_path, 'r')
   header = f_in.readline()
   
+  counter = 0
   for line in f_in.readlines():
     if line.strip() == '':
       break
     tokens = line.split(',')
     source, target = int(tokens[0]), int(tokens[1])
+    date_inst = parser.parse(tokens[6])
     
     if (source, target) not in network.edge_dict:
       if source == -1 and target == -1:
@@ -75,7 +77,18 @@ def read(input_path, network):
       # Seek shortest path from source to target.
       edges = network.shortest_path(source, target)
       
+      counter += 1
+      for e in edges:
+        if e.date_inst.year != 1 and e.date_inst != date_inst:
+          print >> sys.stderr, 'different date_inst for edge %s on path (%d, %d)' % (e.id, source, target)
+          print >> sys.stderr, 'current edge: ' + str(network.nodes[e.source]) + ',' + str(network.nodes[e.target])
+          print >> sys.stderr, 'previous path: ' + ','.join(e.date_inst_path)
+          print >> sys.stderr, 'current path: ' + ','.join(tokens[2:6])
+        e.date_inst = date_inst
+        e.date_inst_path = tokens[2:6]
+      
     else:
       print 'road segment with neighboring endpoints in Manhattan (unexpected)'
   
+  print '%d sign installation entries in Manhattan' % counter
   f_in.close()
