@@ -29,13 +29,18 @@ outputFile.write(\
 # 5-9: pickup_longitude, pickup_latitude, rate_code, store_and_fwd_flag, dropoff_longitude
 # 10-14: dropoff_latitude, payment_type, fare_amount, surcharge, mta_tax
 # 15-17: tip_amount, tolls_amount, total_amount
-# 2015/2016
+# 2015, 2016 Jan-June
 # 0-4: VendorID,tpep_pickup_datetime,tpep_dropoff_datetime,passenger_count,trip_distance
 # 5-9: pickup_longitude,pickup_latitude,RateCodeID,store_and_fwd_flag,dropoff_longitude
 # 10-14: dropoff_latitude,payment_type,fare_amount,[c]extra,mta_tax
 # 15-18: tip_amount,tolls_amount,[+]improvement_surcharge,total_amount
+# 2016 July-Dec
+# 0-4: VendorID,tpep_pickup_datetime,tpep_dropoff_datetime,passenger_count,trip_distance
+# 5-9: RatecodeID,store_and_fwd_flag,PULocationID,DOLocationID,payment_type
+# 10-14: fare_amount,extra,mta_tax,tip_amount,tolls_amount
+# 15-16: improvement_surcharge,total_amount
 
-# indices for every year are the same.
+# indices for every year are the same, except for 2016 second half
 indices = [1, 2, 5, 6, 9, 10, -1, 4, 12, 13, 14, 15, 16, 11, 3]
 
 count = 1

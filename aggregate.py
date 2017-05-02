@@ -12,15 +12,28 @@ if num_args < 3:
   print "Usage: python aggregate.py <speed file list> <output file>"
   exit(1)
 
-# Parse the road network.
-network = road_network.read('manhattan_with_distances_clean.txt')
+# Parse the processed road network.
+#network_simple = road_network.read_simple_network('network/manhattan_with_distances_clean.txt')
+#network_full = road_network.read('network/Node.csv', 'network/Edge.csv')
+
+#network_pruned = road_network.prune_network(network_full, network_simple)
+
+#road_network.write_lion_csv(network_pruned, 'network/lion_nodes.csv', 'network/lion_edges.csv')
+#road_network.write_clean_network(network_pruned, 'network/lion_network_pruned.txt')
+
+network_lion = road_network.read_lion('network/lion_nodes.csv', 'network/lion_edges.csv')
+
 # Parse the sign installation.
 #sign_installation.process('corridors_sign_installation.csv', 'sign_installation.csv', network)
 #sign_installation.read('sign_installation.csv', network)
 # Parse the speed limit data.
+
+network = network_lion
 #speed_limit.process('Speed_limit_manhattan_verified.csv', 'speed_limit.csv', network)
 speed_limit.read('speed_limit.csv', network)
-speed_limit.plot_sign('plot_sign.csv', network)
+speed_limit.plot_sign('sign_locations_lion_maxsl.csv', network)
+
+sys.exit(0)
 
 # Time of day definition.
 times_of_day = {
@@ -28,7 +41,7 @@ times_of_day = {
   'mid-day':        [datetime.time(10, 00, 00), datetime.time(15, 59, 59)],
   'afternoon-peak': [datetime.time(16, 00, 00), datetime.time(19, 59, 59)],
   # Left is larger than right. This is left for the 'else' case.
-  'off-peak':       [datetime.time(20, 00, 00), datetime.time(05, 59, 59)],
+  #'off-peak':       [datetime.time(20, 00, 00), datetime.time(05, 59, 59)],
 }
 times_of_day_rank = {
   'morning-peak':   0,
@@ -72,25 +85,26 @@ for speed_file in f_speeds.readlines():
     dt_tokens = [int(x) for x in re.split('-|_', line_tokens[0])]
     year, month, day, hour, minute, second = dt_tokens
     dt = datetime.datetime(year, month, day, hour, minute, second)
-    """
-    time_of_day = ''
+    time_of_day = 'off-peak' # If not in other time_of_day bins, then it's off peak.
     for t_of_day, t_range in times_of_day.iteritems():
-      # If not in other time_of_day bins, then it's off peak.
-      if t_of_day == 'off-peak' or (t_range[0] <= dt.time() and dt.time() <= t_range[1]):
+      if t_range[0] <= dt.time() and dt.time() <= t_range[1]:
         time_of_day = t_of_day
         break
-    day_of_week = days_of_week[dt.weekday()]
-    """
-    
+    #day_of_week = days_of_week[dt.weekday()]
+
     speeds = [float(x) for x in line_tokens[1:]]
     for edge_index, speed in enumerate(speeds):
       if speed == -1:
         continue # Skip roads without computed speeds.
-      sign = network.edges[edge_index].sign
-      #bin_id = str(hour)
+      #sign = network.edges[edge_index].sign
+      #speed_limit = network.edges[edge_index].speed_limit
+      #if sign == 'conflict' or sign == 'unknown':
+      #  continue # Skip conflict and unknown signs
+
       #bin_id = ','.join([sign, 'before' if dt < announcement_date else 'after'])
-      bin_id = ','.join([str(x) for x in [year, month, sign]])
-      #bin_id = ','.join([str(x) for x in [year, month, day_of_week, time_of_day]])
+      #, time_of_day
+      bin_id = ','.join([str(x) for x in [edge_index, year, month]])
+
       if not bin_id in bins:
         bins[bin_id] = [0, 0] # [sum of speed, count]
       
@@ -104,22 +118,20 @@ for bin_id, val in bins.iteritems():
 
 def results_sorter(x):
   tokens = x[0].split(',')
-  # year, month, day_of_week, time_of_day
-  # return [int(tokens[0]), int(tokens[1]), days_of_week_rank[tokens[2]], times_of_day_rank[tokens[3]]]
-  # year, month, sign
-  return [int(x) for x in tokens[:-1]] + [0 if tokens[-1] == 'no' else 1]
+  # year, month, time_of_day_rank, edge_index
+  # times_of_day_rank[tokens[3]],
+  return [int(tokens[1]), int(tokens[2]), int(tokens[0])]
 
 def bin_id_formatter(x):
-  year, month, sign = x.split(',')
-  return year + '/' + ('' if len(month) == 2 else '0') + month + ',' + sign
+  segment_id, year, month = x.split(',') #, time_of_day
+  return segment_id + ',' + year + '/' +  month # + ',' + time_of_day
 
 sorted_results = sorted(results, key=results_sorter)
 
 f_output = open(sys.argv[2], 'w')
 
 # CSV header line.
-#f_output.write('Year,Month,Day_of_Week,Time_of_Day,Speed\n')
-f_output.write('Year/Month,Sign,Speed\n')
+f_output.write('segment_id,year_month,speed\n')#,time_of_day
 #f_output.write('Sign,Announcement,Speed\n')
 
 for res in sorted_results: 
