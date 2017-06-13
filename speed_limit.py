@@ -50,7 +50,7 @@ def process(input_path, output_path, network):
     
     source = network.find_intersection((from_y, from_x))
     target = network.find_intersection((to_y, to_x))
-    f_out.write('%d,%d,%f,%f,%f,%f,' % (source, target, from_y, from_x, to_y, to_x))
+    f_out.write('%d,%d,%d,%f,%f,%f,%f,' % (source, target, from_y, from_x, to_y, to_x))
     f_out.write('%s,%s,%s,%s,%s,%s,' % (
         tokens[idx_sl110714], tokens[idx_sg110714],
         tokens[idx_sl120415], tokens[idx_sg120415],
@@ -202,7 +202,7 @@ def plot_sign(output_path, network):
   """
   f_out = open(output_path, 'w')
   
-  f_out.write('segment_id,latitude,longitude,speed_limit,sign\n')
+  f_out.write('edge_id,latitude,longitude,speed_limit,sign\n')
   for e in network.edges:
     source, target = network.nodes[e.source], network.nodes[e.target]
     if e.sign == 'conflict' or e.sign == 'unknown': # skip conflict and unknown for now
@@ -211,5 +211,6 @@ def plot_sign(output_path, network):
     #f_out.write('%s,%s\n' % (str(target), e.sign))
     m_lat = (source.lat + target.lat) / 2
     m_lon = (source.lon + target.lon) / 2
-    f_out.write('%d,%f,%f,%.2f,%s\n' % (e.segment_id, m_lat, m_lon, e.speed_limit, e.sign))
+    f_out.write('%d,%f,%f,%.2f,%s\n' % (e.edge_id, m_lat, m_lon,
+                                        e.speed_limit, e.sign))
     

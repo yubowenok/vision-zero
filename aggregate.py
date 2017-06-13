@@ -5,35 +5,60 @@
 
 import sys, datetime, re
 import road_network, sign_installation, speed_limit
+import argparse
 
-num_args = len(sys.argv)
+parser = argparse.ArgumentParser(
+  description='Aggregate the estimated speed/volume of TLC trip records for yellow cabs.')
+parser.add_argument('--data_list', dest='data_list', type=str, required=True,
+                    help='file listing the data paths')
+parser.add_argument('--type', dest='type', type=str, required=True,
+                    help='aggregation type: year, month, day_of_month, time_of_day, day_of_week, hour, speed_limit')
+parser.add_argument('--output', dest='output', type=str, required=True,
+                    help='output path')
+parser.add_argument('--segment_id', dest='segment_id', default=True, type=bool,
+                    help='group by segment id')
 
-if num_args < 3:
-  print "Usage: python aggregate.py <speed file list> <output file>"
-  exit(1)
+args = parser.parse_args()
+
+aggregation_type = args.type
+include_segment_id = args.segment_id
 
 # Parse the processed road network.
+
+# Read the simple network from previous speed estimation work.
 #network_simple = road_network.read_simple_network('network/manhattan_with_distances_clean.txt')
-#network_full = road_network.read('network/Node.csv', 'network/Edge.csv')
+# Read the full LION network.
+#network_full = road_network.read_lion('network/Node.csv', 'network/Edge.csv')
 
+# Generate a pruned network for nodes in Manhattan only from the full LION network.
 #network_pruned = road_network.prune_network(network_full, network_simple)
-
+# Write the pruned network to node/edge files.
 #road_network.write_lion_csv(network_pruned, 'network/lion_nodes.csv', 'network/lion_edges.csv')
+# Write the pruned network to a clean network file used by speed estimation (without attributes irrelevant to speed estimation).
 #road_network.write_clean_network(network_pruned, 'network/lion_network_pruned.txt')
 
+# Read the lion network.
 network_lion = road_network.read_lion('network/lion_nodes.csv', 'network/lion_edges.csv')
 
-# Parse the sign installation.
+# Parse the sign installation. We do not have complete information and the precise installation dates
+# for now. The following lines generate and read the (incomplete) sign installation information.
 #sign_installation.process('corridors_sign_installation.csv', 'sign_installation.csv', network)
 #sign_installation.read('sign_installation.csv', network)
+
+
 # Parse the speed limit data.
 
 network = network_lion
-#speed_limit.process('Speed_limit_manhattan_verified.csv', 'speed_limit.csv', network)
-speed_limit.read('speed_limit.csv', network)
-speed_limit.plot_sign('sign_locations_lion_maxsl.csv', network)
 
-sys.exit(0)
+# If speed limit information is needed, then place the speed_limit.csv file
+# within the running directory and uncomment the line that generates/reads it.
+# Generate speed limit
+#speed_limit.process('Speed_limit_manhattan_verified.csv', 'speed_limit.csv', network)
+# Read speed limit
+#speed_limit.read('speed_limit.csv', network)
+# Plot speed limit (for visualization only)
+#speed_limit.plot_sign('sign_locations_lion_maxsl.csv', network)
+
 
 # Time of day definition.
 times_of_day = {
@@ -51,7 +76,7 @@ times_of_day_rank = {
 }
 
 # Day of week definition.
-days_of_week = {
+days_of_week_names = {
   0: 'Mon',
   1: 'Tue-Thu',
   2: 'Tue-Thu',
@@ -67,14 +92,32 @@ days_of_week_rank = {
   'Sat': 3,
   'Sun': 4,
 }
+day_of_week_names = {
+  0: 'Mon',
+  1: 'Tue',
+  2: 'Wed',
+  3: 'Thu',
+  4: 'Fri',
+  5: 'Sat',
+  6: 'Sun'
+}
+day_of_week_rank = {
+  'Mon': 0,
+  'Tue': 1,
+  'Wed': 2,
+  'Thu': 3,
+  'Fri': 4,
+  'Sat': 5,
+  'Sun': 6
+}
 
 # Stores the bin sum and count.
-# Bin id is '<year>,<month>,<day of week>,<time of day>'
+# Bin id is a concatenation of attributes, such as '<segment_id>,<year>,<month>,<day of week>'
 bins = {}
 announcement_date = datetime.datetime(2014, 11, 7)
 
 # Process the speed files.
-f_speeds = open(sys.argv[1], 'r')
+f_speeds = open(args.data_list, 'r')
 for speed_file in f_speeds.readlines():
   if speed_file.strip() == '':
     continue
@@ -90,7 +133,7 @@ for speed_file in f_speeds.readlines():
       if t_range[0] <= dt.time() and dt.time() <= t_range[1]:
         time_of_day = t_of_day
         break
-    #day_of_week = days_of_week[dt.weekday()]
+    day_of_week = day_of_week_names[dt.weekday()]
 
     speeds = [float(x) for x in line_tokens[1:]]
     for edge_index, speed in enumerate(speeds):
@@ -103,7 +146,21 @@ for speed_file in f_speeds.readlines():
 
       #bin_id = ','.join([sign, 'before' if dt < announcement_date else 'after'])
       #, time_of_day
-      bin_id = ','.join([str(x) for x in [edge_index, year, month]])
+      bin_id = '' if not include_segment_id else str(edge_index) + ','
+      if aggregation_type == 'year':
+        bin_id += ','.join([str(x) for x in [year]])
+      elif aggregation_type == 'month':
+        bin_id += ','.join([str(x) for x in [year, month]])
+      elif aggregation_type == 'day_of_month':
+        bin_id += ','.join([str(x) for x in [year, month, day]])
+      elif aggregation_type == 'time_of_day':
+        bin_id += ','.join([str(x) for x in [year, month, time_of_day]])
+      elif aggregation_type == 'day_of_week':
+        bin_id += ','.join([str(x) for x in [year, month, day_of_week]])
+      elif aggregation_type == 'hour':
+        bin_id += ','.join([str(x) for x in [year, month, hour]])
+      elif aggregation_type == 'speed_limit':
+        bin_id += ','.join([str(x) for x in [year, month, speed_limit]])
 
       if not bin_id in bins:
         bins[bin_id] = [0, 0] # [sum of speed, count]
@@ -118,21 +175,89 @@ for bin_id, val in bins.iteritems():
 
 def results_sorter(x):
   tokens = x[0].split(',')
-  # year, month, time_of_day_rank, edge_index
-  # times_of_day_rank[tokens[3]],
-  return [int(tokens[1]), int(tokens[2]), int(tokens[0])]
+  sort_list = []
+  if include_segment_id:
+    sort_list.append(tokens[0]) # segment id
+    tokens = tokens[1:]
+  if aggregation_type == 'year':
+    # year
+    sort_list += [int(tokens[0])]
+  elif aggregation_type == 'month':
+    # year, month
+    sort_list += [int(tokens[0]), int(tokens[1])]
+  elif aggregation_type == 'day_of_month':
+    # year, month, day
+    sort_list += [int(tokens[0]), int(tokens[1]), int(tokens[2])]
+  elif aggregation_type == 'time_of_day':
+    # year, month, time_of_day
+    sort_list += [int(tokens[0]), int(tokens[1]), times_of_day_rank[tokens[2]]]
+  elif aggregation_type == 'day_of_week':
+    # year, month, day_of_week
+    sort_list += [int(tokens[0]), int(tokens[1]), day_of_week_rank[tokens[2]]]
+  elif aggregation_type == 'hour':
+    # year, month, hour
+    sort_list += [int(tokens[0]), int(tokens[1]), int(tokens[2])]
+  elif aggregation_type == 'speed_limit':
+    # year, month, speed_limit
+    sort_list += [int(tokens[0]), int(tokens[1]), int(tokens[2])]
+  return sort_list
+
+def norm_date(y, s):
+  return y + '/' + ('0' + s if len(s) == 1 else s)
 
 def bin_id_formatter(x):
-  segment_id, year, month = x.split(',') #, time_of_day
-  return segment_id + ',' + year + '/' +  month # + ',' + time_of_day
+  tokens = x.split(',')
+  elements = []
+  if include_segment_id:
+    elements.append(tokens[0])
+    tokens = tokens[1:]
+  if aggregation_type == 'year':
+    # year
+    elements += [tokens[0]]
+  elif aggregation_type == 'month':
+    # year, month
+    elements += [norm_date(tokens[0], tokens[1])]
+  elif aggregation_type == 'day_of_month':
+    # year, month, day
+    elements += [norm_date(tokens[0], tokens[1]), tokens[2]]
+  elif aggregation_type == 'time_of_day':
+    # year, month, time_of_day
+    elements += [norm_date(tokens[0], tokens[1]), tokens[2]]
+  elif aggregation_type == 'day_of_week':
+    # year, month, day_of_week
+    elements += [norm_date(tokens[0], tokens[1]), tokens[2]]
+  elif aggregation_type == 'hour':
+    # year, month, hour
+    elements += [norm_date(tokens[0], tokens[1]), tokens[2]]
+  elif aggregation_type == 'speed_limit':
+    # year, month, speed_limit
+    elements += [norm_date(tokens[0], tokens[1]), tokens[2]]
+  return ','.join(elements)
 
 sorted_results = sorted(results, key=results_sorter)
 
-f_output = open(sys.argv[2], 'w')
+f_output = open(args.output, 'w')
 
 # CSV header line.
-f_output.write('segment_id,year_month,speed\n')#,time_of_day
-#f_output.write('Sign,Announcement,Speed\n')
+#f_output.write('year_month,day,speed\n')#,time_of_day
+header_line = '' if not include_segment_id else 'segment_id,'
+if aggregation_type == 'year':
+  header_line += 'year'
+elif aggregation_type == 'month':
+  header_line += 'year_month'
+elif aggregation_type == 'day_of_month':
+  header_line += 'year_month,day'
+elif aggregation_type == 'time_of_day':
+  header_line += 'year_month,time_of_day'
+elif aggregation_type == 'day_of_week':
+  header_line += 'year_month,day_of_week'
+elif aggregation_type == 'hour':
+  header_line += 'year_month,hour'
+elif aggregation_type == 'speed_limit':
+  header_line += 'year_month,speed_limit'
+header_line += ',volume\n'
+
+f_output.write(header_line)
 
 for res in sorted_results: 
   f_output.write('%s,' % bin_id_formatter(res[0]))
