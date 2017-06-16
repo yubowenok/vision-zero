@@ -53,16 +53,15 @@ network = network_lion
 #sign_installation.read('network/sign_installation.csv', network)
 
 
-# Parse the speed limit data.
-
 # If speed limit information is needed, then place the speed_limit.csv file
 # within the running directory and uncomment the line that generates/reads it.
-# Generate speed limit
-#speed_limit.process('Speed_limit_manhattan_verified.csv', 'speed_limit.csv', network)
-# Read speed limit
-speed_limit.read('network/speed_limit.csv', network)
-# Plot speed limit (for visualization only)
-#speed_limit.plot_sign('sign_locations_lion_maxsl.csv', network)
+if args.sign:
+  # Generate speed limit
+  #speed_limit.process('Speed_limit_manhattan_verified.csv', 'speed_limit.csv', network)
+  # Read speed limit
+  speed_limit.read('network/speed_limit.csv', network)
+  # Plot speed limit (for visualization only)
+  #speed_limit.plot_sign('sign_locations_lion_maxsl.csv', network)
 
 
 # Time of day definition.
