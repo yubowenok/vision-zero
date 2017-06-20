@@ -7,25 +7,43 @@ import sys, datetime, re
 import road_network, sign_installation, speed_limit
 import argparse
 
+supported_bin_attrs = [
+  'segment',
+  'day_of_month',
+  'time_of_day',
+  'day_of_week',
+  'is_weekday',
+  'hour',
+  'speed_limit',
+  'sign'
+]
+
 parser = argparse.ArgumentParser(
   description='Aggregate the estimated speed/volume of TLC trip records for yellow cabs.')
 parser.add_argument('--data_list', dest='data_list', type=str, required=True,
                     help='file listing the data paths')
-parser.add_argument('--type', dest='type', type=str, required=True,
-                    help='aggregation type: year, month, day_of_month, time_of_day, day_of_week, is_weekday, hour, speed_limit')
+parser.add_argument('--bin', dest='bin', type=str, required=True,
+                    help='bin attributes as a comma separated string of the following:' +
+                         ','.join(supported_bin_attrs))
 parser.add_argument('--output', dest='output', type=str, required=True,
                     help='output path')
-parser.add_argument('--segment_id', dest='segment_id', default=True, action='store_true',
-                    help='group by segment id')
-parser.add_argument('--sign', dest='sign', default=False, action='store_true',
-                    help='group by with/without signs')
+parser.add_argument('--with_sign', dest='with_sign', action='store_true',
+                    help='include only segments with signs')
+parser.add_argument('--without_sign', dest='with_sign', action='store_false',
+                    help='include only segments without signs')
 parser.add_argument('--data_type', dest='data_type', default='speed', type=str,
-                    help='aggregated data type: speed, volume, sample_count (only affect csv header)')
+                    help='aggregated data type: speed, volume, count (only affect csv header)')
+parser.set_defaults(with_sign=None)
 
 args = parser.parse_args()
 
-aggregation_type = args.type
-include_segment_id = args.segment_id
+bin_attrs = args.bin.split(',')
+for attr in bin_attrs:
+  if attr not in supported_bin_attrs:
+    print >> sys.stderr, 'unsupported bin attribute "%s"' % attr
+    sys.exit(1)
+
+with_sign = args.with_sign
 
 # Parse the processed road network.
 
@@ -55,13 +73,12 @@ network = network_lion
 
 # If speed limit information is needed, then place the speed_limit.csv file
 # within the running directory and uncomment the line that generates/reads it.
-if args.sign:
-  # Generate speed limit
-  #speed_limit.process('Speed_limit_manhattan_verified.csv', 'speed_limit.csv', network)
-  # Read speed limit
-  speed_limit.read('network/speed_limit.csv', network)
-  # Plot speed limit (for visualization only)
-  #speed_limit.plot_sign('sign_locations_lion_maxsl.csv', network)
+# Generate speed limit
+#speed_limit.process('Speed_limit_manhattan_verified.csv', 'speed_limit.csv', network)
+# Read speed limit
+speed_limit.read('network/speed_limit.csv', network)
+# Plot speed limit (for visualization only)
+#speed_limit.plot_sign('sign_locations_lion_maxsl.csv', network)
 
 
 # Time of day definition.
@@ -145,33 +162,32 @@ for speed_file in f_speeds.readlines():
       if speed == -1:
         continue # Skip roads without computed speeds.
       sign = network.edges[edge_index].sign
+
+      if (with_sign == True and sign != 'yes') or (with_sign == False and sign != 'no'):
+        continue
+
       speed_limit = network.edges[edge_index].speed_limit
 
-      #if sign == 'conflict' or sign == 'unknown':
-      #  continue # Skip conflict and unknown signs
-
       #bin_id = ','.join([sign, 'before' if dt < announcement_date else 'after'])
-      bin_id = '' if not include_segment_id else str(edge_index) + ','
+      bin_arr = [year, month]
 
-      if args.sign:
-        bin_id += sign + ','
+      for attr in bin_attrs:
+        if attr == 'segment':
+          bin_arr.append(edge_index)
+        elif attr == 'day_of_month':
+          bin_arr.append(day)
+        elif attr == 'time_of_day':
+          bin_arr.append(time_of_day)
+        elif attr == 'day_of_week':
+          bin_arr.append(day_of_week)
+        elif attr == 'hour':
+          bin_arr.append(hour)
+        elif attr == 'speed_limit':
+          bin_arr.append(speed_limit)
+        elif attr == 'is_weekday':
+          bin_arr.append(is_weekday)
 
-      if aggregation_type == 'year':
-        bin_id += ','.join([str(x) for x in [year]])
-      elif aggregation_type == 'month':
-        bin_id += ','.join([str(x) for x in [year, month]])
-      elif aggregation_type == 'day_of_month':
-        bin_id += ','.join([str(x) for x in [year, month, day]])
-      elif aggregation_type == 'time_of_day':
-        bin_id += ','.join([str(x) for x in [year, month, time_of_day]])
-      elif aggregation_type == 'day_of_week':
-        bin_id += ','.join([str(x) for x in [year, month, day_of_week]])
-      elif aggregation_type == 'hour':
-        bin_id += ','.join([str(x) for x in [year, month, hour]])
-      elif aggregation_type == 'speed_limit':
-        bin_id += ','.join([str(x) for x in [year, month, speed_limit]])
-      elif aggregation_type == 'is_weekday':
-        bin_id += ','.join([str(x) for x in [year, month, is_weekday]])
+      bin_id = tuple(bin_arr)
 
       if not bin_id in bins:
         bins[bin_id] = [0, 0] # [sum of speed, count]
@@ -185,78 +201,14 @@ for bin_id, val in bins.iteritems():
   results.append([bin_id, speed])
 
 def results_sorter(x):
-  tokens = x[0].split(',')
-  sort_list = []
-  if include_segment_id:
-    sort_list.append(tokens[0]) # segment id
-    tokens = tokens[1:]
-  if args.sign:
-    sort_list.append(tokens[0]) # sign
-    tokens = tokens[1:]
+  return x[0]
 
-  if aggregation_type == 'year':
-    # year
-    sort_list += [int(tokens[0])]
-  elif aggregation_type == 'month':
-    # year, month
-    sort_list += [int(tokens[0]), int(tokens[1])]
-  elif aggregation_type == 'day_of_month':
-    # year, month, day
-    sort_list += [int(tokens[0]), int(tokens[1]), int(tokens[2])]
-  elif aggregation_type == 'time_of_day':
-    # year, month, time_of_day
-    sort_list += [int(tokens[0]), int(tokens[1]), times_of_day_rank[tokens[2]]]
-  elif aggregation_type == 'day_of_week':
-    # year, month, day_of_week
-    sort_list += [int(tokens[0]), int(tokens[1]), day_of_week_rank[tokens[2]]]
-  elif aggregation_type == 'hour':
-    # year, month, hour
-    sort_list += [int(tokens[0]), int(tokens[1]), int(tokens[2])]
-  elif aggregation_type == 'speed_limit':
-    # year, month, speed_limit
-    sort_list += [int(tokens[0]), int(tokens[1]), int(tokens[2])]
-  elif aggregation_type == 'is_weekday':
-    # year, month, is_weekday
-    sort_list += [int(tokens[0]), int(tokens[1]), 0 if tokens[2] == 'True' else 1]
-  return sort_list
-
-def norm_date(y, s):
-  return y + '/' + ('0' + s if len(s) == 1 else s)
+def norm_date(y, m):
+  return str(y) + '/' + ('0' + str(m) if m < 10 else str(m))
 
 def bin_id_formatter(x):
-  tokens = x.split(',')
-  elements = []
-  if include_segment_id:
-    elements.append(tokens[0]) # segment id
-    tokens = tokens[1:]
-  if args.sign:
-    elements.append(tokens[0]) # sign
-    tokens = tokens[1:]
-
-  if aggregation_type == 'year':
-    # year
-    elements += [tokens[0]]
-  elif aggregation_type == 'month':
-    # year, month
-    elements += [norm_date(tokens[0], tokens[1])]
-  elif aggregation_type == 'day_of_month':
-    # year, month, day
-    elements += [norm_date(tokens[0], tokens[1]), tokens[2]]
-  elif aggregation_type == 'time_of_day':
-    # year, month, time_of_day
-    elements += [norm_date(tokens[0], tokens[1]), tokens[2]]
-  elif aggregation_type == 'day_of_week':
-    # year, month, day_of_week
-    elements += [norm_date(tokens[0], tokens[1]), tokens[2]]
-  elif aggregation_type == 'hour':
-    # year, month, hour
-    elements += [norm_date(tokens[0], tokens[1]), tokens[2]]
-  elif aggregation_type == 'speed_limit':
-    # year, month, speed_limit
-    elements += [norm_date(tokens[0], tokens[1]), tokens[2]]
-  elif aggregation_type == 'is_weekday':
-    # year, month, is_weekday
-    elements += [norm_date(tokens[0], tokens[1]), tokens[2]]
+  # The first two attrs are year, month and are formatted as YYYY/MM
+  elements = [norm_date(x[0], x[1])] + [str(s) for s in x[2:]]
   return ','.join(elements)
 
 sorted_results = sorted(results, key=results_sorter)
@@ -264,27 +216,9 @@ sorted_results = sorted(results, key=results_sorter)
 f_output = open(args.output, 'w')
 
 # CSV header line.
-header_line = '' if not include_segment_id else 'segment_id,'
-if args.sign:
-  header_line += 'sign,'
-
-if aggregation_type == 'year':
-  header_line += 'year'
-elif aggregation_type == 'month':
-  header_line += 'year_month'
-elif aggregation_type == 'day_of_month':
-  header_line += 'year_month,day'
-elif aggregation_type == 'time_of_day':
-  header_line += 'year_month,time_of_day'
-elif aggregation_type == 'day_of_week':
-  header_line += 'year_month,day_of_week'
-elif aggregation_type == 'hour':
-  header_line += 'year_month,hour'
-elif aggregation_type == 'speed_limit':
-  header_line += 'year_month,speed_limit'
-elif aggregation_type == 'is_weekday':
-  header_line += 'year_month,is_weekday'
-
+header_line = 'year_month'
+for attr in bin_attrs:
+  header_line += ',' + str(attr)
 header_line += ',' + args.data_type + '\n'
 
 f_output.write(header_line)
