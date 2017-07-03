@@ -15,7 +15,8 @@ supported_bin_attrs = [
   'is_weekday',
   'hour',
   'speed_limit',
-  'sign'
+  'sign',
+  'season'
 ]
 
 parser = argparse.ArgumentParser(
@@ -31,6 +32,8 @@ parser.add_argument('--with_sign', dest='with_sign', action='store_true',
                     help='include only segments with signs')
 parser.add_argument('--without_sign', dest='with_sign', action='store_false',
                     help='include only segments without signs')
+parser.add_argument('--total', dest='total', action='store_true',
+                    help='compute total rather than average')
 parser.add_argument('--data_type', dest='data_type', default='speed', type=str,
                     help='aggregated data type: speed, volume, count (only affect csv header)')
 parser.set_defaults(with_sign=None)
@@ -44,6 +47,7 @@ for attr in bin_attrs:
     sys.exit(1)
 
 with_sign = args.with_sign
+compute_total = args.total
 
 # Parse the processed road network.
 
@@ -131,6 +135,12 @@ day_of_week_rank = {
   'Sat': 5,
   'Sun': 6
 }
+seasons = {
+  'Spring': [3, 4, 5],
+  'Summer': [6, 7, 8],
+  'Fall': [9, 10, 11],
+  'Winter': [12, 1, 2]
+}
 
 # Stores the bin sum and count.
 # Bin id is a concatenation of attributes, such as '<segment_id>,<year>,<month>,<day of week>'
@@ -154,6 +164,10 @@ for speed_file in f_speeds.readlines():
       if t_range[0] <= dt.time() and dt.time() <= t_range[1]:
         time_of_day = t_of_day
         break
+    season = ''
+    for season_name, season_months in seasons.iteritems():
+      if month in season_months:
+        season = season_name
     day_of_week = day_of_week_names[dt.weekday()]
     is_weekday = True if dt.weekday() <= 4 else False
 
@@ -170,6 +184,7 @@ for speed_file in f_speeds.readlines():
 
       #bin_id = ','.join([sign, 'before' if dt < announcement_date else 'after'])
       bin_arr = [year, month]
+      #bin_arr = [] # used for non year/month computation
 
       for attr in bin_attrs:
         if attr == 'segment':
@@ -186,6 +201,8 @@ for speed_file in f_speeds.readlines():
           bin_arr.append(speed_limit)
         elif attr == 'is_weekday':
           bin_arr.append(is_weekday)
+        elif attr == 'season':
+          bin_arr.append(season)
 
       bin_id = tuple(bin_arr)
 
@@ -197,8 +214,12 @@ for speed_file in f_speeds.readlines():
       
 results = []
 for bin_id, val in bins.iteritems():
-  speed = -1 if val[1] == 0 else (val[0] / val[1]) # avg = sum / count
-  results.append([bin_id, speed])
+  if not compute_total:
+    value = -1 if val[1] == 0 else (val[0] / val[1]) # avg = sum / count
+    results.append([bin_id, value])
+  else:
+    results.append([bin_id, val[0]])
+
 
 def results_sorter(x):
   return x[0]
@@ -209,6 +230,8 @@ def norm_date(y, m):
 def bin_id_formatter(x):
   # The first two attrs are year, month and are formatted as YYYY/MM
   elements = [norm_date(x[0], x[1])] + [str(s) for s in x[2:]]
+
+  #elements = [str(s) for s in x] # used for non year/month computation
   return ','.join(elements)
 
 sorted_results = sorted(results, key=results_sorter)
@@ -217,6 +240,7 @@ f_output = open(args.output, 'w')
 
 # CSV header line.
 header_line = 'year_month'
+#header_line = '' # used for non year/month computation
 for attr in bin_attrs:
   header_line += ',' + str(attr)
 header_line += ',' + args.data_type + '\n'
@@ -228,4 +252,7 @@ for res in sorted_results:
   if res[1] < 0:
     f_output.write('-1\n')
   else:
-    f_output.write('%.6f\n' % res[1])
+    if compute_total:
+      f_output.write('%d\n' % res[1])
+    else: # average
+      f_output.write('%.6f\n' % res[1])

@@ -47,7 +47,7 @@ class Edge:
     self.sign_path = '' # path that sets the sign
     self.speed_limit = 0 # speed limit 0 is unknown
     self.speed_limits = [] # all limits identified
-  
+
 
 class RoadNetwork:
   
@@ -66,7 +66,20 @@ class RoadNetwork:
     for edge in edges:
       self.edge_dict[(edge.source, edge.target)] = edge
       self.nodes[edge.source].incident_edges.append(edge)
-  
+
+
+  def edge_center(self, segment_id):
+    """
+    Args:
+      segment_id: number.
+
+    Returns: The coordinates of the center of the segment.
+    """
+    edge = self.edges[segment_id]
+    lat1, lon1 = self.nodes[edge.source].lat, self.nodes[edge.source].lon
+    lat2, lon2 = self.nodes[edge.target].lat, self.nodes[edge.target].lon
+    return ((lat1 + lat2) / 2, (lon1 + lon2) / 2)
+
   def find_intersection(self, point):
     """Finds the intersection that is closest to (lon, lat)
     Returns: Id of the intersection
@@ -85,6 +98,7 @@ class RoadNetwork:
       #print >> sys.stderr, 'cannot find intersection that matches %s' % (point,)
       return -1
     return choice
+
     
   def shortest_path(self, source, target, street=''):
     """Finds the shortest path from soruce to target.
