@@ -30,9 +30,9 @@ for line in f_control.readlines():
     continue # skip header
 
   tokens = line.split(',')
-  segment_id, season, is_weekday, time_of_day, speed = tokens
+  segment_id, season, is_weekday, time_of_day, speed, hour_count, trip_count = tokens
   bin_id = (int(segment_id), season, is_weekday, time_of_day)
-  control_results[bin_id] = float(speed)
+  control_results[bin_id] = [float(speed), int(hour_count), int(trip_count)]
 
 treatment_results = {}
 first_line = True
@@ -46,13 +46,23 @@ for line in f_treatment.readlines():
     continue # skip header
 
   tokens = line.split(',')
-  segment_id, season, is_weekday, time_of_day, speed = tokens
+  segment_id, season, is_weekday, time_of_day, speed, hour_count, trip_count = tokens
   bin_id = (int(segment_id), season, is_weekday, time_of_day)
-  treatment_results[bin_id] = float(speed)
+  treatment_results[bin_id] = [float(speed), int(hour_count), int(trip_count)]
 
 
 sorted_results = []
 
+
+for bin_id, control_values in control_results.iteritems():
+  treatment_values = treatment_results[bin_id] if bin_id in treatment_results else [-1, 0, 0]
+  sorted_results.append(list(bin_id) + control_values + treatment_values)
+
+for bin_id, treatment_values in treatment_results.iteritems():
+  if bin_id not in control_results:
+    sorted_results.append(list(bin_id) + [-1, 0, 0] + treatment_values)
+
+"""
 control_but_not_treatment = 0
 for bin_id, speed in control_results.iteritems():
   if bin_id not in treatment_results:
@@ -73,13 +83,16 @@ for bin_id, speed in treatment_results.iteritems():
 
 print '# has control but no treatment = %d' % control_but_not_treatment
 print '# has treatment but no control = %d' % treatment_but_not_control
+"""
 
 sorted_results = sorted(sorted_results)
 
 f_output = open(args.output, 'w')
-f_output.write('segment,season,is_weekday,time_of_day,control,treatment\n')
+f_output.write('segment,season,is_weekday,time_of_day,')
+f_output.write('control_speed,control_hour_count,control_trip_count,')
+f_output.write('treatment_speed,treatment_hour_count,treatment_trip_count\n')
 
 for row in sorted_results:
-  f_output.write('%d,%s,%s,%s,%f,%f\n' % tuple(row))
+  f_output.write('%d,%s,%s,%s,%f,%d,%d,%f,%d,%d\n' % tuple(row))
 
 

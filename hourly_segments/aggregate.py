@@ -22,14 +22,12 @@ supported_bin_attrs = [
 parser = argparse.ArgumentParser(
   description='Aggregate the estimated speed/volume of TLC trip records for yellow cabs.')
 parser.add_argument('--data_list', dest='data_list', type=str, required=True,
-                    help='file listing the data paths')
+                    help='list of data file paths')
 parser.add_argument('--bin', dest='bin', type=str, required=True,
                     help='bin attributes as a comma separated string of the following:' +
                          ','.join(supported_bin_attrs))
 parser.add_argument('--output', dest='output', type=str, required=True,
                     help='output path')
-parser.add_argument('--with_sign', dest='with_sign', action='store_true',
-                    help='include only segments with signs')
 parser.add_argument('--without_sign', dest='with_sign', action='store_false',
                     help='include only segments without signs')
 parser.add_argument('--total', dest='total', action='store_true',
@@ -153,8 +151,15 @@ for speed_file in f_speeds.readlines():
   if speed_file.strip() == '':
     continue
   print >> sys.stderr, 'processing %s' % speed_file.strip()
+
+  # get count file
+  count_file = re.sub('speeds', 'lion_counts', speed_file)
+
   f = open(speed_file.strip(), 'r')
+  c = open(count_file.strip(), 'r')
   for line in f.readlines():
+    count_tokens = c.readline().rstrip().split()
+
     line_tokens = line.split()
     dt_tokens = [int(x) for x in re.split('-|_', line_tokens[0])]
     year, month, day, hour, minute, second = dt_tokens
@@ -172,10 +177,12 @@ for speed_file in f_speeds.readlines():
     is_weekday = True if dt.weekday() <= 4 else False
 
     speeds = [float(x) for x in line_tokens[1:]]
+    counts = [int(x) for x in count_tokens[1:]]
     for edge_index, speed in enumerate(speeds):
       if speed == -1:
         continue # Skip roads without computed speeds.
       sign = network.edges[edge_index].sign
+      count = counts[edge_index]
 
       if (with_sign == True and sign != 'yes') or (with_sign == False and sign != 'no'):
         continue
@@ -183,8 +190,8 @@ for speed_file in f_speeds.readlines():
       speed_limit = network.edges[edge_index].speed_limit
 
       #bin_id = ','.join([sign, 'before' if dt < announcement_date else 'after'])
-      bin_arr = [year, month]
-      #bin_arr = [] # used for non year/month computation
+      #bin_arr = [year, month]
+      bin_arr = [] # used for non year/month computation
 
       for attr in bin_attrs:
         if attr == 'segment':
@@ -207,19 +214,20 @@ for speed_file in f_speeds.readlines():
       bin_id = tuple(bin_arr)
 
       if not bin_id in bins:
-        bins[bin_id] = [0, 0] # [sum of speed, count]
+        bins[bin_id] = [0, 0, 0] # [sum of speed, count, trip count]
       
       bins[bin_id][0] += speed
       bins[bin_id][1] += 1
-      
+      bins[bin_id][2] += count
+
+
 results = []
 for bin_id, val in bins.iteritems():
   if not compute_total:
     value = -1 if val[1] == 0 else (val[0] / val[1]) # avg = sum / count
-    results.append([bin_id, value])
+    results.append([bin_id, value, val[1], val[2]])
   else:
     results.append([bin_id, val[0]])
-
 
 def results_sorter(x):
   return x[0]
@@ -229,9 +237,9 @@ def norm_date(y, m):
 
 def bin_id_formatter(x):
   # The first two attrs are year, month and are formatted as YYYY/MM
-  elements = [norm_date(x[0], x[1])] + [str(s) for s in x[2:]]
+  #elements = [norm_date(x[0], x[1])] + [str(s) for s in x[2:]]
 
-  #elements = [str(s) for s in x] # used for non year/month computation
+  elements = [str(s) for s in x] # used for non year/month computation
   return ','.join(elements)
 
 sorted_results = sorted(results, key=results_sorter)
@@ -239,20 +247,21 @@ sorted_results = sorted(results, key=results_sorter)
 f_output = open(args.output, 'w')
 
 # CSV header line.
-header_line = 'year_month'
-#header_line = '' # used for non year/month computation
+#header_line = 'year_month'
+header_line = [] # used for non year/month computation
 for attr in bin_attrs:
-  header_line += ',' + str(attr)
-header_line += ',' + args.data_type + '\n'
-
-f_output.write(header_line)
+  header_line.append(str(attr))
+header_line.append(args.data_type)
+header_line += ['hour_count', 'trip_count']
+f_output.write(','.join(header_line) + '\n')
 
 for res in sorted_results: 
   f_output.write('%s,' % bin_id_formatter(res[0]))
   if res[1] < 0:
-    f_output.write('-1\n')
+    f_output.write('-1')
   else:
     if compute_total:
-      f_output.write('%d\n' % res[1])
+      f_output.write('%d' % res[1])
     else: # average
-      f_output.write('%.6f\n' % res[1])
+      f_output.write('%.6f' % res[1])
+  f_output.write(',%d,%d\n' % (res[2], res[3]))
