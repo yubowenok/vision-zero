@@ -3,6 +3,7 @@ from raw_trip import *
 
 stats = TripStats()
 zone_locator = ZoneLocator('/data/taxi/ODzones_vertices.csv')
+logger = Logger()
 
 def process_raw_data(file):
   f = open(file, 'r')
@@ -18,7 +19,7 @@ def process_raw_data(file):
       continue
 
     try:
-      trip = RawTrip(line=line, zone_locator=zone_locator, stats=stats)
+      trip = RawTrip(line=line, zone_locator=zone_locator, stats=stats, logger=logger)
     except Exception:
       pass
 
@@ -28,3 +29,4 @@ def process_raw_data(file):
 process_raw_data('/Users/bowen/Desktop/yellow_tripdata_2014-01.csv')
 
 stats.report()
+logger.report('/Users/bowen/Desktop/longs.csv')

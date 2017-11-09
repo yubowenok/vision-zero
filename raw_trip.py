@@ -114,7 +114,7 @@ class ZoneLocator:
 
 
 class RawTrip:
-  def __init__(self, line, zone_locator, stats):
+  def __init__(self, line, zone_locator, stats, logger):
     """
     Args:
       line: Line of string containing the trip record.
@@ -128,7 +128,12 @@ class RawTrip:
       else:
         try:
           value = float(value)
+          if value == 0 and (key.find('lon') != -1 or key.find('lat') != -1):
+            value = None
         except Exception:
+          value = None
+
+        if value == None: # value is zero if the data is wrong or no value is present
           if key.find('pickup') != -1:
             stats.add_counter('missing_pickup')
             raise Exception('missing pickup location')
@@ -137,9 +142,7 @@ class RawTrip:
             raise Exception('missing dropoff location')
           else:
             print >> sys.stderr, 'FATAL ERROR'
-
       setattr(self, key, value)
-
 
     if self.distance < .1:
       stats.add_counter('short_distance')
@@ -169,12 +172,15 @@ class RawTrip:
 
     vincenty_distance = vincenty((self.pickup_lat, self.pickup_lon),
                                  (self.dropoff_lat, self.dropoff_lon)).miles
-    if self.distance < vincenty_distance:
+    if vincenty_distance < .1:
+      stats.add_counter('short_euclidean_distance')
+      raise Exception('Euclidean distance < .1 miles')
+    if self.distance < .5 * vincenty_distance:
       stats.add_counter('impossible_short_distance')
-      raise Exception('distance < Euclidean distance')
-    elif self.distance > 3 * vincenty_distance:
+      raise Exception('distance < .5 x Euclidean distance')
+    elif self.distance > 10. * vincenty_distance:
       stats.add_counter('impossible_long_distance')
-      raise Exception('distance > 3 x Euclidean distance')
+      raise Exception('distance > 10 x Euclidean distance')
 
     self.pickup_zone = zone_locator.locate(self.pickup_lon, self.pickup_lat)
     if self.pickup_zone == -1:
@@ -209,9 +215,11 @@ class TripStats:
     self.short_distance = 0
     # distance > 20 miles
     self.long_distance = 0
-    # distance < Euclidean distance
+    # Euclidean distance < .1 miles
+    self.short_euclidean_distance = 0
+    # distance < .5 x Euclidean distance
     self.impossible_short_distance = 0
-    # distance > 3 x Euclidean distance
+    # distance > 10 x Euclidean distance
     self.impossible_long_distance = 0
 
     # speed < 1 mph
@@ -238,6 +246,7 @@ class TripStats:
       'long_duration',
       'short_distance',
       'long_distance',
+      'short_euclidean_distance',
       'impossible_short_distance',
       'impossible_long_distance',
       'slow_speed',
@@ -252,3 +261,18 @@ class TripStats:
       regular -= count
       print '%s: %d (%.2f%%)' % (key, count, 1. * count / self.total * 100)
     print 'regular: %d (%.2f%%)' % (regular, 1. * regular / self.total * 100)
+
+
+class Logger:
+  def __init__(self):
+    self.logs = []
+
+  def add_line(self, line):
+    self.logs.append(line)
+
+  def report(self, file=''):
+    if file == '':
+      print ''.join(self.logs)
+    else:
+      with open(file, 'w') as f:
+        f.write(''.join(self.logs))
