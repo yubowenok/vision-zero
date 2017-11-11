@@ -1,46 +1,6 @@
 import datetime, re, sys
 from geopy.distance import vincenty
 
-# Time of day definition.
-times_of_day = {
-  'morning-peak':   [datetime.time(06, 00, 00), datetime.time(9, 59, 59)],
-  'mid-day':        [datetime.time(10, 00, 00), datetime.time(15, 59, 59)],
-  'afternoon-peak': [datetime.time(16, 00, 00), datetime.time(19, 59, 59)],
-  # Left is larger than right. This is left for the 'else' case.
-  #'off-peak':       [datetime.time(20, 00, 00), datetime.time(05, 59, 59)],
-}
-times_of_day_rank = {
-  'morning-peak':   0,
-  'mid-day':        1,
-  'afternoon-peak': 2,
-  'off-peak':       3,
-}
-
-day_of_week_names = {
-  0: 'Mon',
-  1: 'Tue',
-  2: 'Wed',
-  3: 'Thu',
-  4: 'Fri',
-  5: 'Sat',
-  6: 'Sun'
-}
-day_of_week_rank = {
-  'Mon': 0,
-  'Tue': 1,
-  'Wed': 2,
-  'Thu': 3,
-  'Fri': 4,
-  'Sat': 5,
-  'Sun': 6
-}
-seasons = {
-  'Spring': [3, 4, 5],
-  'Summer': [6, 7, 8],
-  'Fall': [9, 10, 11],
-  'Winter': [12, 1, 2]
-}
-
 # indices for every year are the same, except for 2016 second half
 trip_indices = {
   'pickup_time': 1,
@@ -100,7 +60,11 @@ class ZoneLocator:
       lines = f.readlines()[1:]
       for line in lines:
         tokens = line.rstrip().split(',')
-        zone, lat, lon = int(tokens[2]), float(tokens[3]), float(tokens[4])
+
+        # ODzones_simp_vertices.csv uses Long, Latt
+        # ODzones_vertices.csv uses Latt, Long
+        zone, lat, lon = int(tokens[2]), float(tokens[4]), float(tokens[3])
+
         if zone not in self.zone_polygon:
           self.zone_polygon[zone] = Polygon()
         self.zone_polygon[zone].add_point(lon, lat)
@@ -162,11 +126,11 @@ class RawTrip:
       stats.add_counter('long_duration')
       raise Exception('long duration > 2 hours')
 
-    speed = self.distance / self.trip_time * 3600 # mph
-    if speed < 1:
+    self.speed = self.distance / self.trip_time * 3600 # mph
+    if self.speed < 1:
       stats.add_counter('slow_speed')
       raise Exception('slow speed < 1 mph')
-    elif speed > 100:
+    elif self.speed > 100:
       stats.add_counter('fast_speed')
       raise Exception('fast speed > 100 mph')
 
@@ -175,12 +139,19 @@ class RawTrip:
     if vincenty_distance < .1:
       stats.add_counter('short_euclidean_distance')
       raise Exception('Euclidean distance < .1 miles')
-    if self.distance < .5 * vincenty_distance:
+
+    #if self.distance >= 3 * vincenty_distance and self.distance <= 10 * vincenty_distance:
+    #  logger.add_line('%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n' %
+    #                  (self.distance, vincenty_distance, self.distance / vincenty_distance,
+    #                   self.pickup_lon, self.pickup_lat,
+    #                   self.dropoff_lon, self.dropoff_lat))
+
+    if self.distance < .9 * vincenty_distance:
       stats.add_counter('impossible_short_distance')
-      raise Exception('distance < .5 x Euclidean distance')
-    elif self.distance > 10. * vincenty_distance:
+      raise Exception('distance < .9 x Euclidean distance')
+    elif self.distance > 3. * vincenty_distance:
       stats.add_counter('impossible_long_distance')
-      raise Exception('distance > 10 x Euclidean distance')
+      raise Exception('distance > 3 x Euclidean distance')
 
     self.pickup_zone = zone_locator.locate(self.pickup_lon, self.pickup_lat)
     if self.pickup_zone == -1:
@@ -268,11 +239,15 @@ class Logger:
     self.logs = []
 
   def add_line(self, line):
-    self.logs.append(line)
+    self.logs.append(line.rstrip())
 
-  def report(self, file=''):
+  def report(self, file='', header=''):
     if file == '':
-      print ''.join(self.logs)
+      if header != '':
+        print header + '\n'
+      print '\n'.join(self.logs)
     else:
       with open(file, 'w') as f:
-        f.write(''.join(self.logs))
+        if header != '':
+          f.write(header + '\n')
+        f.write('\n'.join(self.logs))
