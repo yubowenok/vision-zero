@@ -1,0 +1,13 @@
+/data/taxi/speeds/2013_11_01-00_00_00.txt
+/data/taxi/speeds/2013_12_01-00_00_00.txt
+
+/data/taxi/speeds/2014_01_01-00_00_00.txt
+/data/taxi/speeds/2014_02_01-00_00_00.txt
+/data/taxi/speeds/2014_03_01-00_00_00.txt
+/data/taxi/speeds/2014_04_01-00_00_00.txt
+/data/taxi/speeds/2014_05_01-00_00_00.txt
+/data/taxi/speeds/2014_06_01-00_00_00.txt
+/data/taxi/speeds/2014_07_01-00_00_00.txt
+/data/taxi/speeds/2014_08_01-00_00_00.txt
+/data/taxi/speeds/2014_09_01-00_00_00.txt
+/data/taxi/speeds/2014_10_01-00_00_00.txt

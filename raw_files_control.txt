@@ -1,0 +1,13 @@
+/data/taxi/raw/yellow_tripdata_2013-11.csv
+/data/taxi/raw/yellow_tripdata_2013-12.csv
+
+/data/taxi/raw/yellow_tripdata_2014-01.csv
+/data/taxi/raw/yellow_tripdata_2014-02.csv
+/data/taxi/raw/yellow_tripdata_2014-03.csv
+/data/taxi/raw/yellow_tripdata_2014-04.csv
+/data/taxi/raw/yellow_tripdata_2014-05.csv
+/data/taxi/raw/yellow_tripdata_2014-06.csv
+/data/taxi/raw/yellow_tripdata_2014-07.csv
+/data/taxi/raw/yellow_tripdata_2014-08.csv
+/data/taxi/raw/yellow_tripdata_2014-09.csv
+/data/taxi/raw/yellow_tripdata_2014-10.csv
