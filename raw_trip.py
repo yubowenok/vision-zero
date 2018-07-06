@@ -78,7 +78,7 @@ class ZoneLocator:
 
 
 class RawTrip:
-  def __init__(self, line, zone_locator, stats, logger):
+  def __init__(self, line, stats, zone_locator=None, logger=None):
     """
     Args:
       line: Line of string containing the trip record.
@@ -105,7 +105,7 @@ class RawTrip:
             stats.add_counter('missing_dropoff')
             raise Exception('missing dropoff location')
           else:
-            print >> sys.stderr, 'FATAL ERROR'
+            print >> sys.stderr, 'FATAL ERROR', tokens[index]
       setattr(self, key, value)
 
     if self.distance < .1:
@@ -153,15 +153,14 @@ class RawTrip:
       stats.add_counter('impossible_long_distance')
       raise Exception('distance > 3 x Euclidean distance')
 
-    self.pickup_zone = zone_locator.locate(self.pickup_lon, self.pickup_lat)
-    if self.pickup_zone == -1:
-      stats.add_counter('pickup_nozone')
-      raise Exception('pickup location not in any zone')
-    self.dropoff_zone = zone_locator.locate(self.dropoff_lon, self.dropoff_lat)
-    if self.dropoff_zone == -1:
-      stats.add_counter('dropoff_nozone')
-      raise Exception('dropoff location not in any zone')
-
+    #self.pickup_zone = zone_locator.locate(self.pickup_lon, self.pickup_lat)
+    #if self.pickup_zone == -1:
+    #  stats.add_counter('pickup_nozone')
+    #  raise Exception('pickup location not in any zone')
+    #self.dropoff_zone = zone_locator.locate(self.dropoff_lon, self.dropoff_lat)
+    #if self.dropoff_zone == -1:
+    #  stats.add_counter('dropoff_nozone')
+    #  raise Exception('dropoff location not in any zone')
     stats.add_counter()
 
 
@@ -208,7 +207,7 @@ class TripStats:
     if counter != '':
       setattr(self, counter, getattr(self, counter) + 1)
 
-  def report(self):
+  def report(self, file=''):
     entries = [
       'missing_pickup',
       'missing_dropoff',
@@ -225,14 +224,14 @@ class TripStats:
       'pickup_nozone',
       'dropoff_nozone'
     ]
-    print 'total: %d' % self.total
-    regular = self.total
-    for key in entries:
-      count = getattr(self, key)
-      regular -= count
-      print '%s: %d (%.2f%%)' % (key, count, 1. * count / self.total * 100)
-    print 'regular: %d (%.2f%%)' % (regular, 1. * regular / self.total * 100)
-
+    with open(file, 'w') as f:
+      f.write('total: %d\n' % self.total)
+      regular = self.total
+      for key in entries:
+        count = getattr(self, key)
+        regular -= count
+        f.write('%s: %d (%.2f%%)\n' % (key, count, 1. * count / self.total * 100))
+      f.write('regular: %d (%.2f%%)\n' % (regular, 1. * regular / self.total * 100))
 
 class Logger:
   def __init__(self):

@@ -13,7 +13,8 @@ parser.add_argument('--treatment', dest='treatment_file', type=str, required=Tru
                     help='path to treatment speed file')
 parser.add_argument('--output', dest='output', type=str, required=True,
                     help='output path')
-
+parser.add_argument('--missing', dest='missing', type=str, required=True,
+                    help='missing path')
 args = parser.parse_args()
 
 control_results = {}
@@ -37,15 +38,15 @@ with open(args.treatment_file, 'r') as f_treatment:
     bin_id = (pickup_zone, dropoff_zone, season, is_weekday, time_of_day)
     treatment_results[bin_id] = (float(mean), float(std), float(percentile_85), int(count))
 
-with open('missing.csv', 'w') as f_log:
+with open(args.missing, 'w') as f_log:
   f_log.write(','.join([
     'pickup_zone',
     'dropoff_zone',
     'season',
     'is_weekday',
     'time_of_day',
-    'has_control',
-    'has_treatment'
+    'control_count',
+    'treatment_count'
   ]) + '\n')
   with open(args.output, 'w') as f_output:
     f_output.write(','.join([
@@ -70,14 +71,16 @@ with open('missing.csv', 'w') as f_log:
         for season_id in range(4):
           season = season_names[season_id]
           for is_weekday in ['True', 'False']:
-            for time_of_day_id in range(4):
+            for time_of_day_id in range(5):
               time_of_day = time_of_day_names[time_of_day_id]
               bin_id = (pickup_zone, dropoff_zone, season, is_weekday, time_of_day)
 
               has_control, has_treatment = bin_id in control_results, bin_id in treatment_results
 
               if not has_control or not has_treatment:
-                f_log.write('%s,%s,%s,%s,%s,%s,%s\n' % (bin_id + (has_control, has_treatment)))
+                control_count = control_results[bin_id][-1] if has_control else 0
+                treatment_count = treatment_results[bin_id][-1] if has_treatment else 0
+                f_log.write('%s,%s,%s,%s,%s,%d,%d\n' % (bin_id + (control_count, treatment_count)))
                 continue
 
               control_values, treatment_values = control_results[bin_id], treatment_results[bin_id]

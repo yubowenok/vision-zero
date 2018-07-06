@@ -5,15 +5,17 @@ time_of_day_ranges = {
   0: [datetime.time(06, 00, 00), datetime.time(9, 59, 59)],  # morning-peak
   1: [datetime.time(10, 00, 00), datetime.time(15, 59, 59)], # mid-day
   2: [datetime.time(16, 00, 00), datetime.time(19, 59, 59)], # afternoon-peak
+  4: [datetime.time(01, 00, 00), datetime.time(05, 59, 59)]  # mid-night
   # Left is larger than right. This is left for the 'else' case.
-  # 3: [datetime.time(20, 00, 00), datetime.time(05, 59, 59)]  # off-peak
+  # 3: [datetime.time(20, 00, 00), datetime.time(00, 59, 59)]  # off-peak
 }
 
 time_of_day_names = {
   0: 'morning-peak',
   1: 'mid-day',
   2: 'afternoon-peak',
-  3: 'off-peak'
+  3: 'off-peak',
+  4: 'mid-night'
 }
 
 day_of_week_names = {
